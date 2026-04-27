@@ -3,36 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HNFAK AI - KESİN ÇÖZÜM</title>
+    <title>HNFAK AI - GLOBAL EDITION</title>
     <style>
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        header { background: #1e1e1e; padding: 10px 20px; display: flex; gap: 10px; border-bottom: 2px solid #333; align-items: center; }
-        .brand { color: #007acc; font-weight: bold; font-size: 1.4rem; margin-right: 10px; }
+        body { margin: 0; font-family: sans-serif; background: #121212; color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        header { background: #1e1e1e; padding: 15px; display: flex; gap: 10px; border-bottom: 2px solid #333; }
         input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #444; background: #000; color: #0f0; outline: none; }
         button { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
         button:disabled { background: #555; }
         main { display: flex; flex: 1; overflow: hidden; }
         #editor, #preview { flex: 1; display: flex; flex-direction: column; }
-        textarea { width: 100%; height: 100%; background: #1e1e1e; color: #9cdcfe; border: none; padding: 15px; font-family: 'Consolas', monospace; resize: none; outline: none; border-right: 1px solid #333; }
+        textarea { width: 100%; height: 100%; background: #1e1e1e; color: #9cdcfe; border: none; padding: 15px; font-family: monospace; resize: none; outline: none; border-right: 1px solid #333; }
         iframe { width: 100%; height: 100%; background: white; border: none; }
-        .label { background: #333; padding: 5px 15px; font-size: 12px; color: #bbb; text-transform: uppercase; }
+        .label { background: #333; padding: 5px 15px; font-size: 11px; color: #aaa; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="brand">HNFAK AI</div>
-    <input type="text" id="prompt" placeholder="Kanka buraya ne yapacağımı yaz...">
-    <button id="send-btn" onclick="generateCode()">KODU OLUŞTUR</button>
+    <div style="color:#007acc; font-weight:bold; font-size:1.4rem;">HNFAK</div>
+    <input type="text" id="prompt" placeholder="Kanka isteğini yaz (Örn: Neon Yılan Oyunu)">
+    <button id="btn" onclick="generate()">KODU YAZDIR</button>
 </header>
 
 <main>
     <div id="editor">
-        <div class="label">KODLAR</div>
+        <div class="label" id="status">KOD EDİTÖRÜ</div>
         <textarea id="output" spellcheck="false"></textarea>
     </div>
     <div id="preview">
-        <div class="label">ÖNİZLEME</div>
+        <div class="label">CANLI ÖNİZLEME</div>
         <iframe id="screen"></iframe>
     </div>
 </main>
@@ -40,65 +39,62 @@
 <script>
     const output = document.getElementById('output');
     const screen = document.getElementById('screen');
-    const btn = document.getElementById('send-btn');
-    const input = document.getElementById('prompt');
+    const btn = document.getElementById('btn');
+    const status = document.getElementById('status');
 
-    // Senin çalışan API Anahtarın
+    // SENİN ANAHTARIN
     const KEY = "AIzaSyBgw8n9OtmEWdbsJCDLSaemk-Zqlnh0fRg";
 
     function update() {
         const doc = screen.contentDocument || screen.contentWindow.document;
-        doc.open();
-        doc.write(output.value);
-        doc.close();
+        doc.open(); doc.write(output.value); doc.close();
     }
 
-    output.addEventListener('input', update);
-
-    async function generateCode() {
-        if (!input.value) return alert("Kanka boş bırakma!");
+    async function generate() {
+        const p = document.getElementById('prompt').value;
+        if(!p) return alert("Boş bırakma kanka!");
         
         btn.disabled = true;
         btn.innerText = "YAZILIYOR...";
-        output.value = "AI Kodları hazırlıyor, lütfen bekle kanka...";
+        
+        // Denenecek modeller
+        const models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+        let success = false;
 
-        try {
-            // En güncel ve stabil model endpoint'i
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${KEY}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: `Sen profesyonel bir yazılımcısın. Sadece HTML, CSS ve JS kodlarını içeren tek bir dosya döndür. Markdown (açıklama) yapma. İsteğim: ${input.value}` }] }]
-                })
-            });
-
-            const data = await response.json();
+        for(let m of models) {
+            if(success) break;
+            status.innerText = `DENENİYOR: ${m}...`;
             
-            if (data.error) {
-                throw new Error(data.error.message);
-            }
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `Sadece HTML/CSS/JS içeren tek dosya kodu döndür. Açıklama yapma. İstek: ${p}` }] }]
+                    })
+                });
 
-            let code = data.candidates[0].content.parts[0].text;
-            
-            // Markdown temizleme (Baştaki ve sondaki ``` işaretlerini atar)
-            code = code.replace(/```html/g, "").replace(/```javascript/g, "").replace(/```css/g, "").replace(/```/g, "").trim();
-
-            output.value = code;
-            update();
-
-        } catch (err) {
-            alert("HATA: " + err.message);
-            output.value = "Bir hata oluştu: " + err.message;
-        } finally {
-            btn.disabled = false;
-            btn.innerText = "KODU OLUŞTUR";
+                const data = await res.json();
+                if(data.candidates) {
+                    let code = data.candidates[0].content.parts[0].text;
+                    output.value = code.replace(/```html|```javascript|```css|```/g, "").trim();
+                    update();
+                    success = true;
+                    status.innerText = `AKTİF MODEL: ${m}`;
+                }
+            } catch(e) { console.error(m + " başarısız."); }
         }
+
+        if(!success) {
+            alert("Kanka bağlantı engellendi! Lütfen bu dosyayı bir Web Server (veya GitHub Pages) üzerinden aç.");
+            status.innerText = "BAĞLANTI HATASI";
+        }
+        btn.disabled = false;
+        btn.innerText = "KODU YAZDIR";
     }
 
-    // Başlangıç ekranı
-    output.value = "<!DOCTYPE html>\n<html>\n<body style='background:#121212; color:#007acc; text-align:center; padding-top:100px; font-family:sans-serif;'>\n<h1>HNFAK Vadi AI Aktif!</h1>\n<p>Yukarıdaki kutuya isteğini yaz ve butona bas Kadir.</p>\n</body>\n</html>";
+    output.value = "";
     update();
 </script>
-
 </body>
 </html>
